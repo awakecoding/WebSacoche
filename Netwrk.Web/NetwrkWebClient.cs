@@ -100,7 +100,6 @@ namespace Netwrk.Web
             this.Stream = stream;
             writer = new StreamWriter(stream);
             reader = new StreamReader(stream);
-
             writer.AutoFlush = true;
         }
     }

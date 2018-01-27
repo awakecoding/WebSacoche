@@ -19,6 +19,11 @@ namespace SacocheTest
                         Console.WriteLine("{0}: {1}", data.Length, txt);
                         webSocket.Send(data);
                     };
+
+                    socket.OnClose += (webSocket) =>
+                    {
+                        Console.WriteLine("OnClose");
+                    };
                 };
             bool started = webListener.Start();
 

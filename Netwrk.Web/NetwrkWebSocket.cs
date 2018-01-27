@@ -11,6 +11,54 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Web;
 
+/**
+ * The WebSocket Protocol:
+ * https://tools.ietf.org/html/rfc6455
+ *
+ * WebSocket API:
+ * https://msdn.microsoft.com/en-us/library/hh772770/
+ *
+ * Web sockets:
+ * https://html.spec.whatwg.org/multipage/comms.html#network
+ *
+ * MessageEvent:
+ * https://html.spec.whatwg.org/multipage/comms.html#messageevent
+ *
+ * CloseEvent:
+ * https://html.spec.whatwg.org/multipage/comms.html#the-closeevent-interfaces
+ *
+ * The WebSocket Server API:
+ * http://w3c-jseverywhere.github.io/websocket-server/
+ *
+ * Writing WebSocket servers:
+ * https://developer.mozilla.org/en-US/docs/Web/API/WebSockets_API/Writing_WebSocket_servers
+ *
+ */
+
+/**
+ * 5.2 Base Framing Protocol
+ * https://tools.ietf.org/html/rfc6455#section-5.2
+ *
+ *  0                   1                   2                   3
+ *  0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+ * +-+-+-+-+-------+-+-------------+-------------------------------+
+ * |F|R|R|R| opcode|M| Payload len |    Extended payload length    |
+ * |I|S|S|S|  (4)  |A|     (7)     |             (16/64)           |
+ * |N|V|V|V|       |S|             |   (if payload len==126/127)   |
+ * | |1|2|3|       |K|             |                               |
+ * +-+-+-+-+-------+-+-------------+ - - - - - - - - - - - - - - - +
+ * |     Extended payload length continued, if payload len == 127  |
+ * + - - - - - - - - - - - - - - - +-------------------------------+
+ * |                               |Masking-key, if MASK set to 1  |
+ * +-------------------------------+-------------------------------+
+ * | Masking-key (continued)       |          Payload Data         |
+ * +-------------------------------- - - - - - - - - - - - - - - - +
+ * :                     Payload Data continued ...                :
+ * + - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - +
+ * |                     Payload Data continued ...                |
+ * +---------------------------------------------------------------+
+ */
+
 namespace Netwrk.Web
 {
     public class NetwrkWebSocket
@@ -18,10 +66,31 @@ namespace Netwrk.Web
         public const byte WS_BIT_FIN = 0x80;
         public const byte WS_BIT_MASK = 0x80;
         public const byte WS_OPCODE_MASK = 0x0F;
+        public const byte WS_OPCODE_CONTINUATION = 0;
+        public const byte WS_OPCODE_TEXT = 1;
+        public const byte WS_OPCODE_BINARY = 2;
+        public const byte WS_OPCODE_CLOSE = 8;
+        public const byte WS_OPCODE_PING = 9;
+        public const byte WS_OPCODE_PONG = 10;
         public const byte WS_PAYLOAD_MASK = 0x7F;
         public const byte WS_PAYLOAD_16 = 126;
         public const byte WS_PAYLOAD_64 = 127;
         public const string WS_MAGIC_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+        public const ushort WS_READY_STATE_CONNECTING = 0;
+        public const ushort WS_READY_STATE_OPEN = 1;
+        public const ushort WS_READY_STATE_CLOSING = 2;
+        public const ushort WS_READY_STATE_CLOSED = 3;
+
+        public const int WS_CLOSE_STATUS_NORMAL = 1000;
+        public const int WS_CLOSE_STATUS_GOING_AWAY = 1001;
+        public const int WS_CLOSE_STATUS_PROTOCOL_ERROR = 1002;
+        public const int WS_CLOSE_STATUS_UNKNOWN_DATA = 1003;
+        public const int WS_CLOSE_STATUS_INCONSISTENT_DATA = 1007;
+        public const int WS_CLOSE_STATUS_POLICY_VIOLATION = 1008;
+        public const int WS_CLOSE_STATUS_MESSAGE_TOO_BIG = 1009;
+        public const int WS_CLOSE_STATUS_EXTENSION_EXPECTED = 1010;
+        public const int WS_CLOSE_STATUS_SERVER_ERROR = 1011;
 
         private static readonly Random random = new Random();
 
@@ -29,6 +98,7 @@ namespace Netwrk.Web
         public delegate void BinaryMessageEventHander(NetwrkWebSocket socket, byte[] data);
         public delegate void CloseEventHander(NetwrkWebSocket socket);
 
+        bool server;
         private TcpClient client;
         private Stream stream;
         private byte[] smallBuffer = new byte[256];
@@ -39,10 +109,11 @@ namespace Netwrk.Web
         public event BinaryMessageEventHander OnBinaryMessage;
         public event CloseEventHander OnClose;
 
-        public bool Connected { get; private set; }
+        public int ReadyState { get; private set; }
 
         internal NetwrkWebSocket(TcpClient client, Stream stream)
         {
+            this.server = true;
             InitializeConnected(client, stream);
         }
 
@@ -50,18 +121,12 @@ namespace Netwrk.Web
         {
             this.client = client;
             this.stream = stream;
-
-            Connected = true;
-        }
-
-        public NetwrkWebSocket(bool client = true)
-        {
-
+            ReadyState = WS_READY_STATE_OPEN;
         }
 
         public async Task<bool> ConnectAsync(Uri uri, bool secure = false)
         {
-            if (Connected)
+            if (ReadyState == WS_READY_STATE_OPEN)
             {
                 return true;
             }
@@ -115,7 +180,7 @@ namespace Netwrk.Web
 
         public void Start()
         {
-            if (receivingTask == null && Connected)
+            if ((receivingTask == null) && (ReadyState == WS_READY_STATE_OPEN))
             {
                 receivingTask = ReceiveAsync();
             }
@@ -128,7 +193,7 @@ namespace Netwrk.Web
                 return;
             }
 
-            Connected = false;
+            ReadyState = WS_READY_STATE_CLOSED;
 
             OnClose?.Invoke(this);
 
@@ -142,7 +207,7 @@ namespace Netwrk.Web
             WebSocketPacket packet = new WebSocketPacket
             {
                 Fin = true,
-                OpCode = OpCode.Text,
+                Opcode = WS_OPCODE_TEXT,
                 PayloadData = Encoding.UTF8.GetBytes(message)
             };
 
@@ -154,7 +219,7 @@ namespace Netwrk.Web
             WebSocketPacket packet = new WebSocketPacket
             {
                 Fin = true,
-                OpCode = OpCode.Binary,
+                Opcode = WS_OPCODE_BINARY,
                 PayloadData = data
             };
 
@@ -164,7 +229,7 @@ namespace Netwrk.Web
         private async Task ReceiveAsync()
         {
             MemoryStream memoryStream = new MemoryStream();
-            OpCode lastOpCode = OpCode.Close;
+            byte lastOpCode = WS_OPCODE_CLOSE;
 
             while (true)
             {
@@ -181,41 +246,49 @@ namespace Netwrk.Web
                     break;
                 }
 
-                OpCode opCode = packet.OpCode == OpCode.Continuation ? lastOpCode : packet.OpCode;
+                byte opcode = packet.Opcode == WS_OPCODE_CONTINUATION ? lastOpCode : packet.Opcode;
 
-                switch (opCode)
+                switch (opcode)
                 {
-                    case OpCode.Text:
-                    case OpCode.Binary:
+                    case WS_OPCODE_TEXT:
+                    case WS_OPCODE_BINARY:
                         memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
 
                         if (packet.Fin)
                         {
-                            HandleMessage(opCode, memoryStream.ToArray());
+                            HandleMessage(opcode, memoryStream.ToArray());
                             memoryStream.SetLength(0);
                         }
                         break;
-                    case OpCode.Ping:
+
+                    case WS_OPCODE_PING:
                         Send(new WebSocketPacket
                         {
                             Fin = true,
-                            OpCode = OpCode.Pong
+                            Opcode = WS_OPCODE_PONG,
+                            PayloadData = packet.PayloadData
                         });
                         break;
-                    case OpCode.Pong:
+
+                    case WS_OPCODE_PONG:
                         break;
+
+                    case WS_OPCODE_CLOSE:
+                        OnClose?.Invoke(this);
+                        break;
+
                     default:
                         Stop();
                         break;
                 }
 
-                lastOpCode = opCode;
+                lastOpCode = opcode;
             }
         }
 
-        private void HandleMessage(OpCode opCode, byte[] data)
+        private void HandleMessage(byte opcode, byte[] data)
         {
-            if (opCode == OpCode.Text)
+            if (opcode == WS_OPCODE_TEXT)
             {
                 OnTextMessage?.Invoke(this, Encoding.UTF8.GetString(data));
             }
@@ -234,7 +307,7 @@ namespace Netwrk.Web
             await ReadBytesAsync(hdrData, 2);
 
             packet.Fin = (hdrData[0] & WS_BIT_FIN) != 0;
-            packet.OpCode = (OpCode)(hdrData[0] & WS_OPCODE_MASK);
+            packet.Opcode = (byte) (hdrData[0] & WS_OPCODE_MASK);
 
             packet.Masked = (hdrData[1] & WS_BIT_MASK) != 0;
             long payloadSize = (hdrData[1] & WS_PAYLOAD_MASK);
@@ -288,10 +361,12 @@ namespace Netwrk.Web
             {
                 BinaryWriter writer = new BinaryWriter(memoryStream);
 
+                packet.Masked = this.server ? false : true;
+
                 byte[] mask = new byte[4];
                 random.NextBytes(mask);
 
-                writer.Write((byte)(WS_BIT_FIN | (byte)packet.OpCode));
+                writer.Write((byte)(WS_BIT_FIN | (byte)packet.Opcode));
 
                 byte masked = (byte)(packet.Masked ? WS_BIT_MASK : 0);
 
@@ -343,7 +418,7 @@ namespace Netwrk.Web
 
         private class WebSocketPacket
         {
-            public OpCode OpCode { get; set; }
+            public byte Opcode { get; set; }
 
             public bool Fin { get; set; }
 
@@ -352,16 +427,6 @@ namespace Netwrk.Web
             public byte[] PayloadData { get; set; }
 
             public int PayloadLength => PayloadData?.Length ?? 0;
-        }
-
-        private enum OpCode
-        {
-            Continuation = 0,
-            Text = 1,
-            Binary = 2,
-            Close = 8,
-            Ping = 9,
-            Pong = 10
         }
     }
 }

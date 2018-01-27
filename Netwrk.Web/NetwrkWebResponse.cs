@@ -52,7 +52,7 @@ namespace Netwrk.Web
             using (var sha1 = SHA1.Create())
             {
                 string accept = requestKey + NetwrkWebSocket.WS_MAGIC_GUID;
-                byte[] acceptBytes = Encoding.ASCII.GetBytes(accept);
+                byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
                 byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
 
                 return Headers[NetwrkKnownHttpHeaders.SecWebSocketAccept] == Convert.ToBase64String(acceptSha1);
