@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Linq;
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-    public class NetwrkWebHeaderCollection
+    public class SacocheWebHeaderCollection
     {
         private Dictionary<string, List<string>> headers = new Dictionary<string, List<string>>();
 

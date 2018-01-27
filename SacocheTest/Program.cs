@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net;
 using System.Text;
-using Netwrk.Web;
+using Sacoche;
 
 namespace SacocheTest
 {
@@ -9,7 +9,7 @@ namespace SacocheTest
     {
         static void Main(string[] args)
         {
-            var webListener = new NetwrkWebListener(12345);
+            var webListener = new SacocheWebListener(12345);
 
             webListener.OnWebSocketConnection += (listener, socket) =>
                 {

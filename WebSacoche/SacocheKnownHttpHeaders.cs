@@ -2,9 +2,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-	public class NetwrkKnownHttpHeaders
+	public class SacocheKnownHttpHeaders
 	{
 		public const string AIM = "A-IM";
 		public const string Accept = "Accept";

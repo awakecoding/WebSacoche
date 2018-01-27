@@ -6,7 +6,7 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\Netwrk.Web\Netwrk.Web.csproj" />
+        <ProjectReference Include="..\WebSacoche\WebSacoche.csproj" />
     </ItemGroup>
 
 </Project>

@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-	public class NetwrkWebRequest : NetwrkWebMessage
+	public class SacocheWebRequest : SacocheWebMessage
 	{
 		public string Method { get; set; }
 		public string Path { get; set; }
@@ -11,12 +11,12 @@ namespace Netwrk.Web
 
 		internal bool IsWebSocketRequest =>
 			Method == "GET" &&
-			Headers[NetwrkKnownHttpHeaders.Connection] == "Upgrade" &&
-            Headers[NetwrkKnownHttpHeaders.Upgrade] == "websocket" &&
-            Headers[NetwrkKnownHttpHeaders.SecWebSocketVersion] == "13" &&
-			Headers.HasValue(NetwrkKnownHttpHeaders.SecWebSocketKey);
+			Headers[SacocheKnownHttpHeaders.Connection] == "Upgrade" &&
+            Headers[SacocheKnownHttpHeaders.Upgrade] == "websocket" &&
+            Headers[SacocheKnownHttpHeaders.SecWebSocketVersion] == "13" &&
+			Headers.HasValue(SacocheKnownHttpHeaders.SecWebSocketKey);
 		
-        public NetwrkWebRequest()
+        public SacocheWebRequest()
         {
             Method = "GET";
             Path = "/";

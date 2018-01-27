@@ -1,13 +1,13 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-	public abstract class NetwrkWebMessage
+	public abstract class SacocheWebMessage
 	{
 		private byte[] data;
 
-		internal NetwrkWebHeaderCollection Headers { get; } = new NetwrkWebHeaderCollection();
+		internal SacocheWebHeaderCollection Headers { get; } = new SacocheWebHeaderCollection();
 
 		public byte[] Data
 		{
@@ -15,7 +15,7 @@ namespace Netwrk.Web
 			set
 			{
 				data = value;
-				Headers.SetValue(NetwrkKnownHttpHeaders.ContentLength, value?.Length.ToString());
+				Headers.SetValue(SacocheKnownHttpHeaders.ContentLength, value?.Length.ToString());
 			}
 		}
 

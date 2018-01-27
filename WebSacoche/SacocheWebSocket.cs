@@ -59,9 +59,9 @@ using System.Web;
  * +---------------------------------------------------------------+
  */
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-    public class NetwrkWebSocket
+    public class SacocheWebSocket
     {
         public const byte WS_BIT_FIN = 0x80;
         public const byte WS_BIT_MASK = 0x80;
@@ -94,9 +94,9 @@ namespace Netwrk.Web
 
         private static readonly Random random = new Random();
 
-        public delegate void TextMessageEventHander(NetwrkWebSocket socket, string message);
-        public delegate void BinaryMessageEventHander(NetwrkWebSocket socket, byte[] data);
-        public delegate void CloseEventHander(NetwrkWebSocket socket);
+        public delegate void TextMessageEventHander(SacocheWebSocket socket, string message);
+        public delegate void BinaryMessageEventHander(SacocheWebSocket socket, byte[] data);
+        public delegate void CloseEventHander(SacocheWebSocket socket);
 
         bool server;
         private TcpClient client;
@@ -111,7 +111,7 @@ namespace Netwrk.Web
 
         public int ReadyState { get; private set; }
 
-        internal NetwrkWebSocket(TcpClient client, Stream stream)
+        internal SacocheWebSocket(TcpClient client, Stream stream)
         {
             this.server = true;
             InitializeConnected(client, stream);
@@ -138,29 +138,29 @@ namespace Netwrk.Web
 
                 await client.ConnectAsync(uri.Host, uri.Port).ConfigureAwait(false);
 
-                NetwrkWebClient webClient = new NetwrkWebClient(client);
+                SacocheWebClient webClient = new SacocheWebClient(client);
 
                 if (secure)
                 {
                     await webClient.SslAuthenticateAsClientAsync(uri.Host);
                 }
 
-                NetwrkWebRequest request = new NetwrkWebRequest
+                SacocheWebRequest request = new SacocheWebRequest
                 {
                     Path = uri.AbsolutePath
                 };
 
                 string clientKey = GenerateClientKey();
 
-                request.Headers[NetwrkKnownHttpHeaders.Connection] = "Upgrade";
-                request.Headers[NetwrkKnownHttpHeaders.Upgrade] = "websocket";
-                request.Headers[NetwrkKnownHttpHeaders.Host] = uri.Host;
-                request.Headers[NetwrkKnownHttpHeaders.SecWebSocketVersion] = "13";
-                request.Headers[NetwrkKnownHttpHeaders.SecWebSocketKey] = clientKey;
+                request.Headers[SacocheKnownHttpHeaders.Connection] = "Upgrade";
+                request.Headers[SacocheKnownHttpHeaders.Upgrade] = "websocket";
+                request.Headers[SacocheKnownHttpHeaders.Host] = uri.Host;
+                request.Headers[SacocheKnownHttpHeaders.SecWebSocketVersion] = "13";
+                request.Headers[SacocheKnownHttpHeaders.SecWebSocketKey] = clientKey;
 
                 await webClient.SendAsync(request);
 
-                NetwrkWebResponse response = await webClient.ReceiveAsync<NetwrkWebResponse>();
+                SacocheWebResponse response = await webClient.ReceiveAsync<SacocheWebResponse>();
 
                 if (!response.IsWebSocketAccepted || !response.IsKeyValid(clientKey))
                 {
