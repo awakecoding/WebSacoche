@@ -2,18 +2,18 @@ using System;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-    public class NetwrkWebResponse : NetwrkWebMessage
+    public class SacocheWebResponse : SacocheWebMessage
     {
         public string Version { get; set; }
-        public NetwrkHttpStatusCode StatusCode { get; set; }
+        public SacocheHttpStatusCode StatusCode { get; set; }
 
         internal bool IsWebSocketAccepted =>
-            StatusCode == NetwrkHttpStatusCode.SwitchingProtocols &&
-            Headers[NetwrkKnownHttpHeaders.Connection] == "Upgrade" &&
-            Headers[NetwrkKnownHttpHeaders.Upgrade] == "websocket" &&
-            Headers.HasValue(NetwrkKnownHttpHeaders.SecWebSocketAccept);
+            StatusCode == SacocheHttpStatusCode.SwitchingProtocols &&
+            Headers[SacocheKnownHttpHeaders.Connection] == "Upgrade" &&
+            Headers[SacocheKnownHttpHeaders.Upgrade] == "websocket" &&
+            Headers.HasValue(SacocheKnownHttpHeaders.SecWebSocketAccept);
 
         private bool ParseResponseLine(string line)
         {
@@ -35,13 +35,13 @@ namespace Netwrk.Web
             {
                 return false;
             }
-            else if (NetwrkHttpStatusCode.TryParse(code, out var statusCode))
+            else if (SacocheHttpStatusCode.TryParse(code, out var statusCode))
             {
                 StatusCode = statusCode;
             }
             else
             {
-                StatusCode = new NetwrkHttpStatusCode(code, string.Join(" ", parts, 2, parts.Length - 2));
+                StatusCode = new SacocheHttpStatusCode(code, string.Join(" ", parts, 2, parts.Length - 2));
             }
 
             return true;
@@ -51,11 +51,11 @@ namespace Netwrk.Web
         {
             using (var sha1 = SHA1.Create())
             {
-                string accept = requestKey + NetwrkWebSocket.WS_MAGIC_GUID;
+                string accept = requestKey + SacocheWebSocket.WS_MAGIC_GUID;
                 byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
                 byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
 
-                return Headers[NetwrkKnownHttpHeaders.SecWebSocketAccept] == Convert.ToBase64String(acceptSha1);
+                return Headers[SacocheKnownHttpHeaders.SecWebSocketAccept] == Convert.ToBase64String(acceptSha1);
             }
         }
 

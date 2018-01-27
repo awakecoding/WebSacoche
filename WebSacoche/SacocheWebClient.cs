@@ -8,9 +8,9 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Netwrk.Web
+namespace Sacoche
 {
-    internal class NetwrkWebClient
+    internal class SacocheWebClient
     {
         private TcpClient client;
         private StreamReader reader;
@@ -18,7 +18,7 @@ namespace Netwrk.Web
 
         public Stream Stream { get; private set; }
 
-        public NetwrkWebClient(TcpClient client)
+        public SacocheWebClient(TcpClient client)
         {
             this.client = client;
 
@@ -39,7 +39,7 @@ namespace Netwrk.Web
             SetStream(sslStream);
         }
 
-        public async Task<T> ReceiveAsync<T>() where T : NetwrkWebMessage, new()
+        public async Task<T> ReceiveAsync<T>() where T : SacocheWebMessage, new()
         {
             List<string> lines = new List<string>();
 
@@ -65,7 +65,7 @@ namespace Netwrk.Web
             
             message.Parse(lines.ToArray());
 
-            string lengthValue = message.Headers[NetwrkKnownHttpHeaders.ContentLength];
+            string lengthValue = message.Headers[SacocheKnownHttpHeaders.ContentLength];
 
             if (lengthValue != null)
             {
@@ -84,7 +84,7 @@ namespace Netwrk.Web
             return message;
         }
 
-        public async Task SendAsync(NetwrkWebMessage message)
+        public async Task SendAsync(SacocheWebMessage message)
         {          
             await writer.WriteLineAsync(message.ToString());
 
