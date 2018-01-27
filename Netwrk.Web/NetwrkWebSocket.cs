@@ -15,7 +15,7 @@ namespace Netwrk.Web
 {
     public class NetwrkWebSocket
     {
-        public const string ConstantKey = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+        public const string WS_MAGIC_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
         private static readonly object randomLock = new object();
         private static readonly Random random = new Random();

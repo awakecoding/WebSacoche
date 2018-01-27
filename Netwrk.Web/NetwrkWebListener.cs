@@ -126,15 +126,16 @@ namespace Netwrk.Web
 
                     response.Headers[NetwrkKnownHttpHeaders.Upgrade] = "websocket";
                     response.Headers[NetwrkKnownHttpHeaders.Connection] = "Upgrade";
-                    response.Headers[NetwrkKnownHttpHeaders.Server] = "Netwrk/1.0";
+                    response.Headers[NetwrkKnownHttpHeaders.Server] = "WebSacoche";
 
                     using (var sha1 = SHA1.Create())
                     {
-                        string accept = request.Headers[NetwrkKnownHttpHeaders.SecWebSocketKey] + NetwrkWebSocket.ConstantKey;
-                        byte[] acceptBytes = Encoding.ASCII.GetBytes(accept);
+                        string clientKey = request.Headers[NetwrkKnownHttpHeaders.SecWebSocketKey];
+                        string accept = clientKey + NetwrkWebSocket.WS_MAGIC_GUID;
+                        byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
                         byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
-
-                        response.Headers[NetwrkKnownHttpHeaders.SecWebSocketAccept] = Convert.ToBase64String(acceptSha1);
+                        string serverKey = Convert.ToBase64String(acceptSha1);
+                        response.Headers[NetwrkKnownHttpHeaders.SecWebSocketAccept] = serverKey;
                     }
 
                     await webClient.SendAsync(response);

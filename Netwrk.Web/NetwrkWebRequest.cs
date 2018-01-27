@@ -27,11 +27,11 @@ namespace Netwrk.Web
 		{
 			StringBuilder stringBuilder = new StringBuilder();
 
-			stringBuilder.AppendLine($"{Method} {Path} {Version}");
+			stringBuilder.Append($"{Method} {Path} {Version}\r\n");
 
 			foreach (var header in Headers.GetKeys())
 			{
-				stringBuilder.AppendLine($"{header}: {Headers.GetValue(header)}");
+				stringBuilder.Append($"{header}: {Headers.GetValue(header)}\r\n");
 			}
 			
 			return stringBuilder.ToString();

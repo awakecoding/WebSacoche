@@ -85,12 +85,8 @@ namespace Netwrk.Web
         }
 
         public async Task SendAsync(NetwrkWebMessage message)
-        {
-            var mess = message.ToString();
-            mess = mess.Replace("\n", "\r\n");
-            mess = string.Concat(mess, "\r\n");
-            
-            await writer.WriteLineAsync(mess);
+        {          
+            await writer.WriteLineAsync(message.ToString());
 
             if (message.Data != null && message.Data.Length > 0)
             {
