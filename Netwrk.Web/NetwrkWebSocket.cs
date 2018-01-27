@@ -234,6 +234,7 @@ namespace Netwrk.Web
 
         private async Task<WebSocketPacket> ReadPacketHeaderAsync()
         {
+            byte[] mask = new byte[4];
             WebSocketPacket packet = new WebSocketPacket();
 
             byte flags = await ReadByteAsync();
@@ -259,14 +260,14 @@ namespace Netwrk.Web
 
             if (packet.Masked)
             {
-                packet.MaskingKey = IPAddress.NetworkToHostOrder(await ReadIntAsync());
+                await ReadBytesAsync(mask, 4);
             }
 
             await ReadBytesAsync(packet.PayloadData, (int)length);
 
             if (packet.Masked)
             {
-                packet.PayloadData = Mask(packet.PayloadData, packet.MaskingKey);
+                Unmask(packet.PayloadData, mask);
             }
 
             return packet;
@@ -301,7 +302,7 @@ namespace Netwrk.Web
             return await stream.ReadAsync(buffer, 0, count);
         }
 
-        //TODO: Implement fragmentationg (add async for this)
+        //TODO: Implement fragmentation (add async for this)
         private void Send(WebSocketPacket packet)
         {
             byte[] crlf = new byte[4];
@@ -381,6 +382,14 @@ namespace Netwrk.Web
             }
 
             return result;
+        }
+
+        private static void Unmask(byte[] data, byte[] mask)
+        {
+            for (int i = 0; i < data.Length; i++)
+            {
+                data[i] ^= mask[i % 4];
+            }
         }
 
         private class WebSocketPacket
