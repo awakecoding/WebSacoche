@@ -17,7 +17,6 @@ namespace SacocheTest
                     {
                         string txt = Encoding.UTF8.GetString(data);
                         Console.WriteLine("{0}: {1}", data.Length, txt);
-                        Console.WriteLine("{0}", BitConverter.ToString(data));
                         webSocket.Send(data);
                     };
                 };

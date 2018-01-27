@@ -108,6 +108,7 @@ namespace Netwrk.Web
             }
 
             NetwrkWebRequest request = await webClient.ReceiveAsync<NetwrkWebRequest>();
+            NetwrkWebSocket webSocket = new NetwrkWebSocket(client, webClient.Stream);
 
             if (request == null)
             {
@@ -139,8 +140,6 @@ namespace Netwrk.Web
                     }
 
                     await webClient.SendAsync(response);
-
-                    NetwrkWebSocket webSocket = new NetwrkWebSocket(client, webClient.Stream);
 
                     OnWebSocketConnection?.Invoke(this, webSocket);
 

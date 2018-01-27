@@ -15,9 +15,14 @@ namespace Netwrk.Web
 {
     public class NetwrkWebSocket
     {
+        public const byte WS_BIT_FIN = 0x80;
+        public const byte WS_BIT_MASK = 0x80;
+        public const byte WS_OPCODE_MASK = 0x0F;
+        public const byte WS_PAYLOAD_MASK = 0x7F;
+        public const byte WS_PAYLOAD_16 = 126;
+        public const byte WS_PAYLOAD_64 = 127;
         public const string WS_MAGIC_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
-        private static readonly object randomLock = new object();
         private static readonly Random random = new Random();
 
         public delegate void TextMessageEventHander(NetwrkWebSocket socket, string message);
@@ -27,7 +32,7 @@ namespace Netwrk.Web
         private TcpClient client;
         private Stream stream;
         private byte[] smallBuffer = new byte[256];
-        private int maskingKey;
+
         private Task receivingTask;
 
         public event TextMessageEventHander OnTextMessage;
@@ -51,13 +56,7 @@ namespace Netwrk.Web
 
         public NetwrkWebSocket(bool client = true)
         {
-            if (client)
-            {
-                lock (randomLock)
-                {
-                    maskingKey = random.Next(1, int.MaxValue);
-                }
-            }
+
         }
 
         public async Task<bool> ConnectAsync(Uri uri, bool secure = false)
@@ -86,19 +85,19 @@ namespace Netwrk.Web
                     Path = uri.AbsolutePath
                 };
 
-                string webSocketKey = CreateSecWebSocketKey();
+                string clientKey = GenerateClientKey();
 
                 request.Headers[NetwrkKnownHttpHeaders.Connection] = "Upgrade";
                 request.Headers[NetwrkKnownHttpHeaders.Upgrade] = "websocket";
                 request.Headers[NetwrkKnownHttpHeaders.Host] = uri.Host;
                 request.Headers[NetwrkKnownHttpHeaders.SecWebSocketVersion] = "13";
-                request.Headers[NetwrkKnownHttpHeaders.SecWebSocketKey] = webSocketKey;
+                request.Headers[NetwrkKnownHttpHeaders.SecWebSocketKey] = clientKey;
 
                 await webClient.SendAsync(request);
 
                 NetwrkWebResponse response = await webClient.ReceiveAsync<NetwrkWebResponse>();
 
-                if (!response.IsWebSocketAccepted || !response.IsKeyValid(webSocketKey))
+                if (!response.IsWebSocketAccepted || !response.IsKeyValid(clientKey))
                 {
                     return false;
                 }
@@ -143,8 +142,6 @@ namespace Netwrk.Web
             WebSocketPacket packet = new WebSocketPacket
             {
                 Fin = true,
-                Masked = maskingKey != 0,
-                MaskingKey = maskingKey,
                 OpCode = OpCode.Text,
                 PayloadData = Encoding.UTF8.GetBytes(message)
             };
@@ -157,8 +154,6 @@ namespace Netwrk.Web
             WebSocketPacket packet = new WebSocketPacket
             {
                 Fin = true,
-                Masked = maskingKey != 0,
-                MaskingKey = maskingKey,
                 OpCode = OpCode.Binary,
                 PayloadData = data
             };
@@ -204,8 +199,6 @@ namespace Netwrk.Web
                         Send(new WebSocketPacket
                         {
                             Fin = true,
-                            Masked = maskingKey != 0,
-                            MaskingKey = maskingKey,
                             OpCode = OpCode.Pong
                         });
                         break;
@@ -237,58 +230,45 @@ namespace Netwrk.Web
             byte[] mask = new byte[4];
             WebSocketPacket packet = new WebSocketPacket();
 
-            byte flags = await ReadByteAsync();
-            packet.Fin = (flags & 0b1000_0000) != 0;
-            packet.OpCode = (OpCode)(flags & 0b0000_1111);
+            byte[] hdrData = new byte[2];
+            await ReadBytesAsync(hdrData, 2);
 
-            byte lengthByte = await ReadByteAsync();
-            packet.Masked = (lengthByte & 0b1000_0000) != 0;
-            lengthByte &= 0b0111_1111;
+            packet.Fin = (hdrData[0] & WS_BIT_FIN) != 0;
+            packet.OpCode = (OpCode)(hdrData[0] & WS_OPCODE_MASK);
 
-            long length = lengthByte;
+            packet.Masked = (hdrData[1] & WS_BIT_MASK) != 0;
+            long payloadSize = (hdrData[1] & WS_PAYLOAD_MASK);
 
-            if (lengthByte == 127)
+            if (payloadSize == WS_PAYLOAD_16)
             {
-                length = IPAddress.NetworkToHostOrder(await ReadLongAsync());
+                payloadSize = IPAddress.NetworkToHostOrder(await ReadShortAsync());
             }
-            else if (lengthByte == 126)
+            else if (payloadSize == WS_PAYLOAD_64)
             {
-                length = IPAddress.NetworkToHostOrder(await ReadShortAsync());
+                payloadSize = IPAddress.NetworkToHostOrder(await ReadLongAsync());
             }
 
-            packet.PayloadData = new byte[length];
+            packet.PayloadData = new byte[payloadSize];
 
             if (packet.Masked)
             {
                 await ReadBytesAsync(mask, 4);
             }
 
-            await ReadBytesAsync(packet.PayloadData, (int)length);
+            await ReadBytesAsync(packet.PayloadData, (int) payloadSize);
 
             if (packet.Masked)
             {
-                Unmask(packet.PayloadData, mask);
+                Mask(packet.PayloadData, mask);
             }
 
             return packet;
-        }
-
-        private async Task<byte> ReadByteAsync()
-        {
-            await ReadBytesAsync(smallBuffer, sizeof(byte));
-            return smallBuffer[0];
         }
 
         private async Task<short> ReadShortAsync()
         {
             await ReadBytesAsync(smallBuffer, sizeof(short));
             return BitConverter.ToInt16(smallBuffer, 0);
-        }
-
-        private async Task<int> ReadIntAsync()
-        {
-            await ReadBytesAsync(smallBuffer, sizeof(int));
-            return BitConverter.ToInt32(smallBuffer, 0);
         }
 
         private async Task<long> ReadLongAsync()
@@ -302,89 +282,58 @@ namespace Netwrk.Web
             return await stream.ReadAsync(buffer, 0, count);
         }
 
-        //TODO: Implement fragmentation (add async for this)
         private void Send(WebSocketPacket packet)
-        {
-            byte[] crlf = new byte[4];
-            crlf[0] = 0x0D;
-            crlf[1] = 0x0A;
-            crlf[2] = 0x0D;
-            crlf[3] = 0x0A;            
-            
+        {            
             using (MemoryStream memoryStream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(memoryStream);
 
-                writer.Write((byte)(0b1000_0000 | (byte)packet.OpCode));
-                
-                writer.Write(crlf);
+                byte[] mask = new byte[4];
+                random.NextBytes(mask);
 
-                byte masked = (byte)(packet.Masked ? 0b1000_0000 : 0);
+                writer.Write((byte)(WS_BIT_FIN | (byte)packet.OpCode));
 
-                if (packet.PayloadLength > short.MaxValue)
+                byte masked = (byte)(packet.Masked ? WS_BIT_MASK : 0);
+
+                if (packet.PayloadLength < 126)
                 {
-                    writer.Write((byte)(masked | 127));
-                    writer.Write(crlf);
-                    writer.Write(IPAddress.HostToNetworkOrder((long)packet.PayloadLength));
-                    writer.Write(crlf);
+                    writer.Write((byte)(masked | (byte)packet.PayloadLength));
                 }
-                else if (packet.PayloadLength > 125)
+                else if (packet.PayloadLength <= 0xFFFF)
                 {
-                    writer.Write((byte)(masked | 126));
-                    writer.Write(crlf);
+                    writer.Write((byte)(masked | WS_PAYLOAD_16));
                     writer.Write(IPAddress.HostToNetworkOrder((short)packet.PayloadLength));
-                    writer.Write(crlf);
                 }
                 else
                 {
-                    writer.Write((byte)(masked | (byte)packet.PayloadLength));
-                    writer.Write(crlf);
+                    writer.Write((byte)(masked | WS_PAYLOAD_64));
+                    writer.Write(IPAddress.HostToNetworkOrder((long)packet.PayloadLength));
                 }
 
                 if (packet.PayloadLength > 0)
                 {
-                    byte[] data = packet.PayloadData;
-
-                    if (packet.MaskingKey != 0)
+                    if (packet.Masked)
                     {
-                        writer.Write(IPAddress.HostToNetworkOrder(packet.MaskingKey));
-                        writer.Write(crlf);
-
-                        data = Mask(packet.PayloadData, packet.MaskingKey);
+                        writer.Write(mask);
+                        Mask(packet.PayloadData, mask);
                     }
 
-                    memoryStream.Write(data, 0, data.Length);
-                    writer.Write(crlf);
+                    memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
                 }
 
-                stream.Write(memoryStream.ToArray(), 0, (int)memoryStream.Length);
+                stream.Write(memoryStream.ToArray(), 0, (int) memoryStream.Length);
                 stream.Flush();
             }
         }
 
-        private static string CreateSecWebSocketKey()
+        private static string GenerateClientKey()
         {
             byte[] data = new byte[16];
-
             random.NextBytes(data);
-
             return Convert.ToBase64String(data);
         }
 
-        private static byte[] Mask(byte[] data, int maskingKey)
-        {
-            byte[] result = new byte[data.Length];
-            byte[] maskingKeyBytes = BitConverter.GetBytes(maskingKey);
-
-            for (int i = 0; i < result.Length; i++)
-            {
-                result[i] = (byte)(data[i] ^ maskingKeyBytes[i % 4]);
-            }
-
-            return result;
-        }
-
-        private static void Unmask(byte[] data, byte[] mask)
+        private static void Mask(byte[] data, byte[] mask)
         {
             for (int i = 0; i < data.Length; i++)
             {
@@ -399,8 +348,6 @@ namespace Netwrk.Web
             public bool Fin { get; set; }
 
             public bool Masked { get; set; }
-
-            public int MaskingKey { get; set; }
 
             public byte[] PayloadData { get; set; }
 
