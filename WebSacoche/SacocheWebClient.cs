@@ -65,7 +65,7 @@ namespace Sacoche
             
             message.Parse(lines.ToArray());
 
-            string lengthValue = message.Headers[SacocheKnownHttpHeaders.ContentLength];
+            string lengthValue = message.Headers["Content-Length"];
 
             if (lengthValue != null)
             {

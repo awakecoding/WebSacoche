@@ -11,9 +11,9 @@ namespace Sacoche
 
         internal bool IsWebSocketAccepted =>
             StatusCode == SacocheHttpStatusCode.SwitchingProtocols &&
-            Headers[SacocheKnownHttpHeaders.Connection] == "Upgrade" &&
-            Headers[SacocheKnownHttpHeaders.Upgrade] == "websocket" &&
-            Headers.HasValue(SacocheKnownHttpHeaders.SecWebSocketAccept);
+            Headers["Connection"] == "Upgrade" &&
+            Headers["Upgrade"] == "websocket" &&
+            Headers.HasValue("Sec-WebSocket-Accept");
 
         private bool ParseResponseLine(string line)
         {
@@ -54,8 +54,7 @@ namespace Sacoche
                 string accept = requestKey + SacocheWebSocket.WS_MAGIC_GUID;
                 byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
                 byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
-
-                return Headers[SacocheKnownHttpHeaders.SecWebSocketAccept] == Convert.ToBase64String(acceptSha1);
+                return Headers["Sec-WebSocket-Accept"] == Convert.ToBase64String(acceptSha1);
             }
         }
 

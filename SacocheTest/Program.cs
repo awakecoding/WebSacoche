@@ -20,7 +20,7 @@ namespace SacocheTest
                         webSocket.Send(data);
                     };
 
-                    socket.OnClose += (webSocket) =>
+                    socket.OnClose += (webSocket, clean, code, reason) =>
                     {
                         Console.WriteLine("OnClose");
                     };

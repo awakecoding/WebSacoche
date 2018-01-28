@@ -125,18 +125,18 @@ namespace Sacoche
                         StatusCode = SacocheHttpStatusCode.SwitchingProtocols
                     };
 
-                    response.Headers[SacocheKnownHttpHeaders.Upgrade] = "websocket";
-                    response.Headers[SacocheKnownHttpHeaders.Connection] = "Upgrade";
-                    response.Headers[SacocheKnownHttpHeaders.Server] = "WebSacoche";
+                    response.Headers["Upgrade"] = "websocket";
+                    response.Headers["Connection"] = "Upgrade";
+                    response.Headers["Server"] = "WebSacoche";
 
                     using (var sha1 = SHA1.Create())
                     {
-                        string clientKey = request.Headers[SacocheKnownHttpHeaders.SecWebSocketKey];
+                        string clientKey = request.Headers["Sec-WebSocket-Key"];
                         string accept = clientKey + SacocheWebSocket.WS_MAGIC_GUID;
                         byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
                         byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
                         string serverKey = Convert.ToBase64String(acceptSha1);
-                        response.Headers[SacocheKnownHttpHeaders.SecWebSocketAccept] = serverKey;
+                        response.Headers["Sec-WebSocket-Accept"] = serverKey;
                     }
 
                     await webClient.SendAsync(response);

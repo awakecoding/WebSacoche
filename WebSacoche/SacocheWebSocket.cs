@@ -96,7 +96,7 @@ namespace Sacoche
 
         public delegate void TextMessageEventHander(SacocheWebSocket socket, string message);
         public delegate void BinaryMessageEventHander(SacocheWebSocket socket, byte[] data);
-        public delegate void CloseEventHander(SacocheWebSocket socket);
+        public delegate void CloseEventHander(SacocheWebSocket socket, bool clean, ushort code, string reason);
 
         bool server;
         private TcpClient client;
@@ -152,11 +152,11 @@ namespace Sacoche
 
                 string clientKey = GenerateClientKey();
 
-                request.Headers[SacocheKnownHttpHeaders.Connection] = "Upgrade";
-                request.Headers[SacocheKnownHttpHeaders.Upgrade] = "websocket";
-                request.Headers[SacocheKnownHttpHeaders.Host] = uri.Host;
-                request.Headers[SacocheKnownHttpHeaders.SecWebSocketVersion] = "13";
-                request.Headers[SacocheKnownHttpHeaders.SecWebSocketKey] = clientKey;
+                request.Headers["Connection"] = "Upgrade";
+                request.Headers["Upgrade"] = "websocket";
+                request.Headers["Host"] = uri.Host;
+                request.Headers["Sec-WebSocket-Version"] = "13";
+                request.Headers["Sec-WebSocket-Key"] = clientKey;
 
                 await webClient.SendAsync(request);
 
@@ -194,8 +194,6 @@ namespace Sacoche
             }
 
             ReadyState = WS_READY_STATE_CLOSED;
-
-            OnClose?.Invoke(this);
 
             client.Close();
             client = null;
@@ -248,53 +246,59 @@ namespace Sacoche
 
                 byte opcode = packet.Opcode == WS_OPCODE_CONTINUATION ? lastOpCode : packet.Opcode;
 
-                switch (opcode)
+                if ((opcode == WS_OPCODE_TEXT) || (opcode == WS_OPCODE_BINARY))
                 {
-                    case WS_OPCODE_TEXT:
-                    case WS_OPCODE_BINARY:
                         memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
 
                         if (packet.Fin)
                         {
-                            HandleMessage(opcode, memoryStream.ToArray());
+                            byte[] data = memoryStream.ToArray();
+
+                            if (opcode == WS_OPCODE_TEXT)
+                            {
+                                OnTextMessage?.Invoke(this, Encoding.UTF8.GetString(data));
+                            }
+                            else
+                            {
+                                OnBinaryMessage?.Invoke(this, data);
+                            }
+
                             memoryStream.SetLength(0);
                         }
-                        break;
-
-                    case WS_OPCODE_PING:
+                }
+                else if (opcode == WS_OPCODE_PING)
+                {
                         Send(new WebSocketPacket
                         {
                             Fin = true,
                             Opcode = WS_OPCODE_PONG,
                             PayloadData = packet.PayloadData
-                        });
-                        break;
+                        });   
+                }
+                else if (opcode == WS_OPCODE_PONG)
+                {
+                    /* do nothing */
+                }
+                else if (opcode == WS_OPCODE_CLOSE)
+                {
+                    ushort code = WS_CLOSE_STATUS_NORMAL;
+                    string reason = "";
 
-                    case WS_OPCODE_PONG:
-                        break;
+                    if (packet.PayloadLength >= 2)
+                    {
+                        code = (ushort) ((packet.PayloadData[0] << 8) | packet.PayloadData[1]);
+                    }
 
-                    case WS_OPCODE_CLOSE:
-                        OnClose?.Invoke(this);
-                        break;
-
-                    default:
-                        Stop();
-                        break;
+                    OnClose?.Invoke(this, true, code, reason);
+                    Stop();
+                }
+                else
+                {
+                    OnClose?.Invoke(this, false, WS_CLOSE_STATUS_PROTOCOL_ERROR, "");
+                    Stop();
                 }
 
                 lastOpCode = opcode;
-            }
-        }
-
-        private void HandleMessage(byte opcode, byte[] data)
-        {
-            if (opcode == WS_OPCODE_TEXT)
-            {
-                OnTextMessage?.Invoke(this, Encoding.UTF8.GetString(data));
-            }
-            else
-            {
-                OnBinaryMessage?.Invoke(this, data);
             }
         }
 

@@ -15,7 +15,7 @@ namespace Sacoche
 			set
 			{
 				data = value;
-				Headers.SetValue(SacocheKnownHttpHeaders.ContentLength, value?.Length.ToString());
+				Headers.SetValue("Content-Length", value?.Length.ToString());
 			}
 		}
 

@@ -11,10 +11,10 @@ namespace Sacoche
 
 		internal bool IsWebSocketRequest =>
 			Method == "GET" &&
-			Headers[SacocheKnownHttpHeaders.Connection] == "Upgrade" &&
-            Headers[SacocheKnownHttpHeaders.Upgrade] == "websocket" &&
-            Headers[SacocheKnownHttpHeaders.SecWebSocketVersion] == "13" &&
-			Headers.HasValue(SacocheKnownHttpHeaders.SecWebSocketKey);
+			Headers["Connection"] == "Upgrade" &&
+            Headers["Upgrade"] == "websocket" &&
+            Headers["Sec-WebSocket-Version"] == "13" &&
+			Headers.HasValue("Sec-WebSocket-Key");
 		
         public SacocheWebRequest()
         {
