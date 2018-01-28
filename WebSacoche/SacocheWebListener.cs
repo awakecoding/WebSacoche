@@ -122,6 +122,8 @@ namespace Sacoche
                     SacocheWebResponse response = new SacocheWebResponse
                     {
                         Version = request.Version,
+                        Code = 101,
+                        Reason = "Switching Protocols",
                         StatusCode = SacocheHttpStatusCode.SwitchingProtocols
                     };
 
@@ -151,6 +153,8 @@ namespace Sacoche
                 SacocheWebResponse response = OnRequest?.Invoke(this, request) ?? new SacocheWebResponse
                 {
                     Version = request.Version,
+                    Code = 500,
+                    Reason = "Internal Server Error",
                     StatusCode = SacocheHttpStatusCode.InternalServerError
                 };
 

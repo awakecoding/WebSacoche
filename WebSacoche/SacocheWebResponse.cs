@@ -7,6 +7,8 @@ namespace Sacoche
     public class SacocheWebResponse : SacocheWebMessage
     {
         public string Version { get; set; }
+        public int Code { get; set; }
+        public string Reason { get; set; }
         public SacocheHttpStatusCode StatusCode { get; set; }
 
         internal bool IsWebSocketAccepted =>
@@ -37,6 +39,8 @@ namespace Sacoche
             }
             else if (SacocheHttpStatusCode.TryParse(code, out var statusCode))
             {
+                Code = statusCode.Code;
+                Reason = statusCode.Status;
                 StatusCode = statusCode;
             }
             else

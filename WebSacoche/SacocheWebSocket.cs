@@ -101,15 +101,20 @@ namespace Sacoche
         bool server;
         private TcpClient client;
         private Stream stream;
-        private byte[] smallBuffer = new byte[256];
 
         private Task receivingTask;
 
         public event TextMessageEventHander OnTextMessage;
         public event BinaryMessageEventHander OnBinaryMessage;
+
         public event CloseEventHander OnClose;
 
         public int ReadyState { get; private set; }
+
+        public SacocheWebSocket()
+        {
+            this.server = false;
+        }
 
         internal SacocheWebSocket(TcpClient client, Stream stream)
         {
@@ -318,11 +323,15 @@ namespace Sacoche
 
             if (payloadSize == WS_PAYLOAD_16)
             {
-                payloadSize = IPAddress.NetworkToHostOrder(await ReadShortAsync());
+                byte[] bytes16 = new byte[2];
+                await ReadBytesAsync(bytes16, 2);
+                payloadSize = BitConverter.ToUInt16(bytes16.Reverse().ToArray(), 0);
             }
             else if (payloadSize == WS_PAYLOAD_64)
             {
-                payloadSize = IPAddress.NetworkToHostOrder(await ReadLongAsync());
+                byte[] bytes64 = new byte[8];
+                await ReadBytesAsync(bytes64, 8);
+                payloadSize = (long) BitConverter.ToUInt64(bytes64.Reverse().ToArray(), 0);
             }
 
             packet.PayloadData = new byte[payloadSize];
@@ -342,18 +351,6 @@ namespace Sacoche
             return packet;
         }
 
-        private async Task<short> ReadShortAsync()
-        {
-            await ReadBytesAsync(smallBuffer, sizeof(short));
-            return BitConverter.ToInt16(smallBuffer, 0);
-        }
-
-        private async Task<long> ReadLongAsync()
-        {
-            await ReadBytesAsync(smallBuffer, sizeof(long));
-            return BitConverter.ToInt64(smallBuffer, 0);
-        }
-
         private async Task<int> ReadBytesAsync(byte[] buffer, int count)
         {
             return await stream.ReadAsync(buffer, 0, count);
@@ -370,23 +367,25 @@ namespace Sacoche
                 byte[] mask = new byte[4];
                 random.NextBytes(mask);
 
-                writer.Write((byte)(WS_BIT_FIN | (byte)packet.Opcode));
+                writer.Write((byte)(WS_BIT_FIN | (byte) packet.Opcode));
 
                 byte masked = (byte)(packet.Masked ? WS_BIT_MASK : 0);
 
                 if (packet.PayloadLength < 126)
                 {
-                    writer.Write((byte)(masked | (byte)packet.PayloadLength));
+                    writer.Write((byte)(masked | (byte) packet.PayloadLength));
                 }
                 else if (packet.PayloadLength <= 0xFFFF)
                 {
+                    byte[] bytes16 = BitConverter.GetBytes((UInt16) packet.PayloadLength).Reverse().ToArray();
                     writer.Write((byte)(masked | WS_PAYLOAD_16));
-                    writer.Write(IPAddress.HostToNetworkOrder((short)packet.PayloadLength));
+                    writer.Write(bytes16);
                 }
                 else
                 {
+                    byte[] bytes64 = BitConverter.GetBytes((UInt64) packet.PayloadLength).Reverse().ToArray();
                     writer.Write((byte)(masked | WS_PAYLOAD_64));
-                    writer.Write(IPAddress.HostToNetworkOrder((long)packet.PayloadLength));
+                    writer.Write(bytes64);
                 }
 
                 if (packet.PayloadLength > 0)
