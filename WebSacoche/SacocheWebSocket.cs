@@ -157,10 +157,13 @@ namespace Sacoche
 
                 SacocheWebRequest request = new SacocheWebRequest
                 {
-                    Path = uri.AbsolutePath
+                    Method = "GET",
+                    Path = uri.AbsolutePath,
+                    Version = "HTTP/1.1"
                 };
 
                 string clientKey = GenerateClientKey();
+                string serverKey = ComputeServerKey(clientKey);
 
                 request.Headers["Connection"] = "Upgrade";
                 request.Headers["Upgrade"] = "websocket";
@@ -172,7 +175,21 @@ namespace Sacoche
 
                 SacocheWebResponse response = await webClient.ReceiveAsync<SacocheWebResponse>();
 
-                if (!response.IsWebSocketAccepted || !response.IsKeyValid(clientKey))
+                if (response.Code != 101)
+                    return false;
+
+                if (response.Headers["Connection"] != "Upgrade")
+                    return false;
+
+                if (response.Headers["Upgrade"] != "websocket")
+                    return false;
+
+                if (!response.Headers.HasValue("Sec-WebSocket-Accept"))
+                    return false;
+
+                string acceptKey = response.Headers["Sec-WebSocket-Accept"];
+
+                if (acceptKey != serverKey)
                 {
                     return false;
                 }
@@ -427,6 +444,18 @@ namespace Sacoche
             byte[] data = new byte[16];
             random.NextBytes(data);
             return Convert.ToBase64String(data);
+        }
+
+        public static string ComputeServerKey(string clientKey)
+        {
+            using (var sha1 = SHA1.Create())
+            {
+                string accept = clientKey + SacocheWebSocket.WS_MAGIC_GUID;
+                byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
+                byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
+                string serverKey = Convert.ToBase64String(acceptSha1);
+                return serverKey;
+            }
         }
 
         private static void Mask(byte[] data, byte[] mask)

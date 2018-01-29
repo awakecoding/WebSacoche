@@ -14,8 +14,6 @@ namespace Sacoche
 {
     public class SacocheWebListener
     {
-        public delegate SacocheWebResponse RequestEventHandler(SacocheWebListener listener, SacocheWebRequest request);
-        public delegate bool WebSocketRequestEventHandler(SacocheWebListener listener, SacocheWebRequest request);
         public delegate void WebSocketConnectionEventHandler(SacocheWebListener listener, SacocheWebSocket webSocket);
 
         private TcpListener listener;
@@ -27,8 +25,6 @@ namespace Sacoche
 
         public bool Listening { get; private set; }
 
-        public event RequestEventHandler OnRequest;
-        public event WebSocketRequestEventHandler OnWebsocketRequest;
         public event WebSocketConnectionEventHandler OnWebSocketConnection;
 
         public SacocheWebListener(int port, IPAddress localAddress = null, X509Certificate2 certificate = null)
@@ -115,53 +111,41 @@ namespace Sacoche
                 return false;
             }
 
-            if (request.IsWebSocketRequest)
+            if (request.Method != "GET")
+                return false;
+
+            if (request.Headers["Connection"] != "Upgrade")
+                return false;
+
+            if (request.Headers["Upgrade"] != "websocket")
+                return false;
+
+            if (request.Headers["Sec-WebSocket-Version"] != "13")
+                return false;
+
+            if (!request.Headers.HasValue("Sec-WebSocket-Key"))
+                return false;
+
+            SacocheWebResponse response = new SacocheWebResponse
             {
-                if (OnWebsocketRequest?.Invoke(this, request) ?? true)
-                {
-                    SacocheWebResponse response = new SacocheWebResponse
-                    {
-                        Version = request.Version,
-                        Code = 101,
-                        Reason = "Switching Protocols",
-                        StatusCode = SacocheHttpStatusCode.SwitchingProtocols
-                    };
+                Version = request.Version,
+                Code = 101,
+                Reason = "Switching Protocols"
+            };
 
-                    response.Headers["Upgrade"] = "websocket";
-                    response.Headers["Connection"] = "Upgrade";
-                    response.Headers["Server"] = "WebSacoche";
+            response.Headers["Upgrade"] = "websocket";
+            response.Headers["Connection"] = "Upgrade";
+            response.Headers["Server"] = "WebSacoche";
 
-                    using (var sha1 = SHA1.Create())
-                    {
-                        string clientKey = request.Headers["Sec-WebSocket-Key"];
-                        string accept = clientKey + SacocheWebSocket.WS_MAGIC_GUID;
-                        byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
-                        byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
-                        string serverKey = Convert.ToBase64String(acceptSha1);
-                        response.Headers["Sec-WebSocket-Accept"] = serverKey;
-                    }
+            string clientKey = request.Headers["Sec-WebSocket-Key"];
+            string serverKey = SacocheWebSocket.ComputeServerKey(clientKey);
+            response.Headers["Sec-WebSocket-Accept"] = serverKey;
 
-                    await webClient.SendAsync(response);
+            await webClient.SendAsync(response);
 
-                    OnWebSocketConnection?.Invoke(this, webSocket);
+            OnWebSocketConnection?.Invoke(this, webSocket);
 
-                    webSocket.Start();
-                }
-            }
-            else
-            {
-                SacocheWebResponse response = OnRequest?.Invoke(this, request) ?? new SacocheWebResponse
-                {
-                    Version = request.Version,
-                    Code = 500,
-                    Reason = "Internal Server Error",
-                    StatusCode = SacocheHttpStatusCode.InternalServerError
-                };
-
-                await webClient.SendAsync(response);
-
-                client.Close();
-            }
+            webSocket.Start();
 
             return true;
         }

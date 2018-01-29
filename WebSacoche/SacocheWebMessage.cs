@@ -7,6 +7,12 @@ namespace Sacoche
 	{
 		private byte[] data;
 
+		public string Method { get; set; }
+		public string Path { get; set; }
+		public string Version { get; set; }
+		public int Code { get; set; }
+        public string Reason { get; set; }
+
 		internal SacocheWebHeaderCollection Headers { get; } = new SacocheWebHeaderCollection();
 
 		public byte[] Data
@@ -19,7 +25,55 @@ namespace Sacoche
 			}
 		}
 
-		private bool ParseHeaderLine(string line)
+		protected bool ParseRequestLine(string line)
+		{
+			if (line == null)
+			{
+				return false;
+			}
+
+			string[] parts = line.Split(' ');
+
+			if (parts.Length != 3)
+			{
+				return false;
+			}
+
+			Method = parts[0];
+			Path = parts[1];
+			Version = parts[2];
+
+			return true;
+		}
+
+		protected bool ParseResponseLine(string line)
+        {
+            if (line == null)
+            {
+                return false;
+            }
+
+            string[] parts = line.Split(' ');
+
+            if (parts.Length < 3)
+            {
+                return false;
+            }
+
+            Version = parts[0];
+
+            if (!int.TryParse(parts[1], out var code))
+            {
+                return false;
+            }
+
+            Code = code; 
+            Reason = string.Join(" ", parts, 2, parts.Length - 2);
+
+            return true;
+        }
+		
+		protected bool ParseHeaderLine(string line)
 		{
 			if (line == null)
 			{
