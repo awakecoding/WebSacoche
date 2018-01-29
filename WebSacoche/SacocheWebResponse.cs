@@ -76,11 +76,11 @@ namespace Sacoche
         {
             StringBuilder stringBuilder = new StringBuilder();
 
-            stringBuilder.AppendLine($"{Version} {StatusCode.Code} {StatusCode.Status}");
+            stringBuilder.Append($"{Version} {StatusCode.Code} {StatusCode.Status}\r\n");
 
             foreach (var header in Headers.GetKeys())
             {
-                stringBuilder.AppendLine($"{header}: {Headers.GetValue(header)}");
+                stringBuilder.Append($"{header}: {Headers.GetValue(header)}\r\n");
             }
 
             return stringBuilder.ToString();
