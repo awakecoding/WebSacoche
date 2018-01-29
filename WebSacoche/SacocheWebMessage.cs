@@ -3,9 +3,8 @@ using System.Text;
 
 namespace Sacoche
 {
-	public abstract class SacocheWebMessage
+	public class SacocheWebMessage
 	{
-		private byte[] data;
 
 		public string Method { get; set; }
 		public string Path { get; set; }
@@ -15,17 +14,7 @@ namespace Sacoche
 
 		internal SacocheWebHeaderCollection Headers { get; } = new SacocheWebHeaderCollection();
 
-		public byte[] Data
-		{
-			get => data;
-			set
-			{
-				data = value;
-				Headers.SetValue("Content-Length", value?.Length.ToString());
-			}
-		}
-
-		protected bool ParseRequestLine(string line)
+		public bool ParseRequestLine(string line)
 		{
 			if (line == null)
 			{
@@ -46,7 +35,7 @@ namespace Sacoche
 			return true;
 		}
 
-		protected bool ParseResponseLine(string line)
+		public bool ParseResponseLine(string line)
         {
             if (line == null)
             {
@@ -96,7 +85,7 @@ namespace Sacoche
 			return true;
 		}
 
-        internal virtual bool Parse(string[] lines)
+        internal virtual bool ParseHeaderLines(string[] lines)
 		{
 			for (int i = 1; i < lines.Length; i++)
 			{

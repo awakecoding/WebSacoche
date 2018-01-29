@@ -97,14 +97,21 @@ namespace Sacoche
         private async Task<bool> HandleClient(TcpClient client)
         {
             SacocheWebClient webClient = new SacocheWebClient(client);
+            SacocheWebSocket webSocket = new SacocheWebSocket(client, webClient.Stream);
 
             if (Certificate != null)
             {
                 await webClient.SslAuthenticateAsServerAsync(Certificate);
             }
 
-            SacocheWebRequest request = await webClient.ReceiveAsync<SacocheWebRequest>();
-            SacocheWebSocket webSocket = new SacocheWebSocket(client, webClient.Stream);
+            string[] lines = await webClient.ReceiveAsync();
+
+            if (lines == null)
+                return false;
+
+            SacocheWebMessage request = new SacocheWebMessage();
+            request.ParseRequestLine(lines[0]);
+            request.ParseHeaderLines(lines);
 
             if (request == null)
             {

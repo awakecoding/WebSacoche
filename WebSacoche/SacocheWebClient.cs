@@ -31,15 +31,13 @@ namespace Sacoche
             await sslStream.AuthenticateAsServerAsync(certificate).ConfigureAwait(false);
             SetStream(sslStream);
         }
-
         public async Task SslAuthenticateAsClientAsync(string targetHost)
         {
             SslStream sslStream = new SslStream(Stream);
             await sslStream.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
             SetStream(sslStream);
         }
-
-        public async Task<T> ReceiveAsync<T>() where T : SacocheWebMessage, new()
+        public async Task<string[]> ReceiveAsync()
         {
             List<string> lines = new List<string>();
 
@@ -61,27 +59,7 @@ namespace Sacoche
                 lines.Add(line);
             }
 
-            T message = new T();
-            
-            message.Parse(lines.ToArray());
-
-            string lengthValue = message.Headers["Content-Length"];
-
-            if (lengthValue != null)
-            {
-                if (!int.TryParse(lengthValue, out var length))
-                {
-                    return null;
-                }
-
-                byte[] data = new byte[length];
-
-                await client.GetStream().ReadAsync(data, 0, length);
-
-                message.Data = data;
-            }
-
-            return message;
+            return lines.ToArray();
         }
 
         public async Task SendAsync(string message)

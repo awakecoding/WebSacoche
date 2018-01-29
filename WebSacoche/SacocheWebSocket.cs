@@ -168,7 +168,14 @@ namespace Sacoche
 
                 await webClient.SendAsync(message);
 
-                SacocheWebResponse response = await webClient.ReceiveAsync<SacocheWebResponse>();
+                string[] lines = await webClient.ReceiveAsync();
+
+                if (lines == null)
+                    return false;
+
+                SacocheWebMessage response = new SacocheWebMessage();
+                response.ParseResponseLine(lines[0]);
+                response.ParseHeaderLines(lines);
 
                 if (response.Code != 101)
                     return false;
