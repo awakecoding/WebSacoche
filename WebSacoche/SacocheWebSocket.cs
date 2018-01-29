@@ -10,6 +10,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
+using NLog;
 
 /**
  * The WebSocket Protocol:
@@ -143,8 +144,7 @@ namespace Sacoche
 
             try
             {
-                TcpClient client = new TcpClient();
-                client.NoDelay = true;
+                TcpClient client = new TcpClient {NoDelay = true};
 
                 await client.ConnectAsync(uri.Host, uri.Port).ConfigureAwait(false);
 
@@ -265,6 +265,13 @@ namespace Sacoche
                     try
                     {
                         packet = await ReadPacketHeaderAsync();
+
+                        if (packet == null)
+                        {
+                            OnClose?.Invoke(this, false, WS_CLOSE_STATUS_PROTOCOL_ERROR, 
+                                new SocketException((int)SocketError.Disconnecting).Message);
+                            Stop();
+                        }
                     }
                     catch (Exception ex)
                     {
@@ -348,7 +355,12 @@ namespace Sacoche
             WebSocketPacket packet = new WebSocketPacket();
 
             byte[] hdrData = new byte[2];
-            await ReadBytesAsync(hdrData, 2);
+            var count = await ReadBytesAsync(hdrData, 2);
+
+            if (count <= 0)
+            {
+                return null;
+            }
 
             packet.Fin = (hdrData[0] & WS_BIT_FIN) != 0;
             packet.Opcode = (byte) (hdrData[0] & WS_OPCODE_MASK);
@@ -393,49 +405,52 @@ namespace Sacoche
 
         private void Send(WebSocketPacket packet)
         {
-            using (MemoryStream memoryStream = new MemoryStream())
+            if (Connected)
             {
-                BinaryWriter writer = new BinaryWriter(memoryStream);
-
-                packet.Masked = this.server ? false : true;
-
-                byte[] mask = new byte[4];
-                random.NextBytes(mask);
-
-                writer.Write((byte) (WS_BIT_FIN | (byte) packet.Opcode));
-
-                byte masked = (byte) (packet.Masked ? WS_BIT_MASK : 0);
-
-                if (packet.PayloadLength < 126)
+                using (MemoryStream memoryStream = new MemoryStream())
                 {
-                    writer.Write((byte) (masked | (byte) packet.PayloadLength));
-                }
-                else if (packet.PayloadLength <= 0xFFFF)
-                {
-                    byte[] bytes16 = BitConverter.GetBytes((UInt16) packet.PayloadLength).Reverse().ToArray();
-                    writer.Write((byte) (masked | WS_PAYLOAD_16));
-                    writer.Write(bytes16);
-                }
-                else
-                {
-                    byte[] bytes64 = BitConverter.GetBytes((UInt64) packet.PayloadLength).Reverse().ToArray();
-                    writer.Write((byte) (masked | WS_PAYLOAD_64));
-                    writer.Write(bytes64);
-                }
+                    BinaryWriter writer = new BinaryWriter(memoryStream);
 
-                if (packet.PayloadLength > 0)
-                {
-                    if (packet.Masked)
+                    packet.Masked = !server;
+
+                    byte[] mask = new byte[4];
+                    random.NextBytes(mask);
+
+                    writer.Write((byte) (WS_BIT_FIN | (byte) packet.Opcode));
+
+                    byte masked = (byte) (packet.Masked ? WS_BIT_MASK : 0);
+
+                    if (packet.PayloadLength < 126)
                     {
-                        writer.Write(mask);
-                        Mask(packet.PayloadData, mask);
+                        writer.Write((byte) (masked | (byte) packet.PayloadLength));
+                    }
+                    else if (packet.PayloadLength <= 0xFFFF)
+                    {
+                        byte[] bytes16 = BitConverter.GetBytes((UInt16) packet.PayloadLength).Reverse().ToArray();
+                        writer.Write((byte) (masked | WS_PAYLOAD_16));
+                        writer.Write(bytes16);
+                    }
+                    else
+                    {
+                        byte[] bytes64 = BitConverter.GetBytes((UInt64) packet.PayloadLength).Reverse().ToArray();
+                        writer.Write((byte) (masked | WS_PAYLOAD_64));
+                        writer.Write(bytes64);
                     }
 
-                    memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
-                }
+                    if (packet.PayloadLength > 0)
+                    {
+                        if (packet.Masked)
+                        {
+                            writer.Write(mask);
+                            Mask(packet.PayloadData, mask);
+                        }
 
-                stream.Write(memoryStream.ToArray(), 0, (int) memoryStream.Length);
-                stream.Flush();
+                        memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
+                    }
+
+                    stream.Write(memoryStream.ToArray(), 0, (int) memoryStream.Length);
+                    stream.Flush();
+                }
             }
         }
 
