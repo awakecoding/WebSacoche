@@ -5,20 +5,6 @@ namespace Sacoche
 {
 	public class SacocheWebRequest : SacocheWebMessage
 	{
-		internal bool IsWebSocketRequest =>
-			Method == "GET" &&
-			Headers["Connection"] == "Upgrade" &&
-            Headers["Upgrade"] == "websocket" &&
-            Headers["Sec-WebSocket-Version"] == "13" &&
-			Headers.HasValue("Sec-WebSocket-Key");
-		
-        public SacocheWebRequest()
-        {
-            Method = "GET";
-            Path = "/";
-            Version = "HTTP/1.1";
-        }
-
 		internal override bool Parse(string[] lines)
 		{
 			if (!ParseRequestLine(lines[0]))

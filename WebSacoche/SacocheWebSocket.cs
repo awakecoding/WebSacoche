@@ -152,7 +152,9 @@ namespace Sacoche
 
                 SacocheWebRequest request = new SacocheWebRequest
                 {
-                    Path = uri.AbsolutePath
+                    Method = "GET",
+                    Path = uri.AbsolutePath,
+                    Version = "HTTP/1.1"
                 };
 
                 string clientKey = GenerateClientKey();
