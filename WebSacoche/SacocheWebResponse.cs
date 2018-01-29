@@ -6,54 +6,6 @@ namespace Sacoche
 {
     public class SacocheWebResponse : SacocheWebMessage
     {
-        public string Version { get; set; }
-        public int Code { get; set; }
-        public string Reason { get; set; }
-
-        internal bool IsWebSocketAccepted =>
-            Code == 101 &&
-            Headers["Connection"] == "Upgrade" &&
-            Headers["Upgrade"] == "websocket" &&
-            Headers.HasValue("Sec-WebSocket-Accept");
-
-        private bool ParseResponseLine(string line)
-        {
-            if (line == null)
-            {
-                return false;
-            }
-
-            string[] parts = line.Split(' ');
-
-            if (parts.Length < 3)
-            {
-                return false;
-            }
-
-            Version = parts[0];
-
-            if (!int.TryParse(parts[1], out var code))
-            {
-                return false;
-            }
-
-            Code = code; 
-            Reason = string.Join(" ", parts, 2, parts.Length - 2);
-
-            return true;
-        }
-
-        internal bool IsKeyValid(string requestKey)
-        {
-            using (var sha1 = SHA1.Create())
-            {
-                string accept = requestKey + SacocheWebSocket.WS_MAGIC_GUID;
-                byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
-                byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
-                return Headers["Sec-WebSocket-Accept"] == Convert.ToBase64String(acceptSha1);
-            }
-        }
-
         internal override bool Parse(string[] lines)
         {
             if (!ParseResponseLine(lines[0]))

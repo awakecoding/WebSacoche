@@ -130,15 +130,9 @@ namespace Sacoche
                     response.Headers["Connection"] = "Upgrade";
                     response.Headers["Server"] = "WebSacoche";
 
-                    using (var sha1 = SHA1.Create())
-                    {
-                        string clientKey = request.Headers["Sec-WebSocket-Key"];
-                        string accept = clientKey + SacocheWebSocket.WS_MAGIC_GUID;
-                        byte[] acceptBytes = Encoding.UTF8.GetBytes(accept);
-                        byte[] acceptSha1 = sha1.ComputeHash(acceptBytes);
-                        string serverKey = Convert.ToBase64String(acceptSha1);
-                        response.Headers["Sec-WebSocket-Accept"] = serverKey;
-                    }
+                    string clientKey = request.Headers["Sec-WebSocket-Key"];
+                    string serverKey = SacocheWebSocket.ComputeServerKey(clientKey);
+                    response.Headers["Sec-WebSocket-Accept"] = serverKey;
 
                     await webClient.SendAsync(response);
 
