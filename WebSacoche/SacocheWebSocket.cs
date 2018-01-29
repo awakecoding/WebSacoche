@@ -173,23 +173,21 @@ namespace Sacoche
                 if (lines == null)
                     return false;
 
-                SacocheWebMessage response = new SacocheWebMessage();
-                response.ParseResponseLine(lines[0]);
-                response.ParseHeaderLines(lines);
+                SacocheHttp.ParseResponseLine(lines[0], out var version, out int code, out string reason);
 
-                if (response.Code != 101)
+                if (code != 101)
                     return false;
 
-                if (response.Headers["Connection"] != "Upgrade")
+                if (SacocheHttp.GetFieldValue(lines, "Connection") != "Upgrade")
                     return false;
 
-                if (response.Headers["Upgrade"] != "websocket")
+                if (SacocheHttp.GetFieldValue(lines, "Upgrade") != "websocket")
                     return false;
 
-                if (!response.Headers.HasValue("Sec-WebSocket-Accept"))
+                if (SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Accept").Length < 1)
                     return false;
 
-                string acceptKey = response.Headers["Sec-WebSocket-Accept"];
+                string acceptKey = SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Accept");
 
                 if (acceptKey != serverKey)
                 {

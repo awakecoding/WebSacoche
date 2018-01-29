@@ -21,7 +21,6 @@ namespace Sacoche
         public SacocheWebClient(TcpClient client)
         {
             this.client = client;
-
             SetStream(client.GetStream());
         }
 
@@ -31,12 +30,14 @@ namespace Sacoche
             await sslStream.AuthenticateAsServerAsync(certificate).ConfigureAwait(false);
             SetStream(sslStream);
         }
+
         public async Task SslAuthenticateAsClientAsync(string targetHost)
         {
             SslStream sslStream = new SslStream(Stream);
             await sslStream.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
             SetStream(sslStream);
         }
+        
         public async Task<string[]> ReceiveAsync()
         {
             List<string> lines = new List<string>();

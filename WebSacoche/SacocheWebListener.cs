@@ -109,31 +109,24 @@ namespace Sacoche
             if (lines == null)
                 return false;
 
-            SacocheWebMessage request = new SacocheWebMessage();
-            request.ParseRequestLine(lines[0]);
-            request.ParseHeaderLines(lines);
+            SacocheHttp.ParseRequestLine(lines[0], out var method, out var path, out var version);
 
-            if (request == null)
-            {
-                return false;
-            }
-
-            if (request.Method != "GET")
+            if (method != "GET")
                 return false;
 
-            if (request.Headers["Connection"] != "Upgrade")
+            if (SacocheHttp.GetFieldValue(lines, "Connection") != "Upgrade")
                 return false;
 
-            if (request.Headers["Upgrade"] != "websocket")
+            if (SacocheHttp.GetFieldValue(lines, "Upgrade") != "websocket")
                 return false;
 
-            if (request.Headers["Sec-WebSocket-Version"] != "13")
+            if (SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Version") != "13")
                 return false;
 
-            if (!request.Headers.HasValue("Sec-WebSocket-Key"))
+            if (SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Key").Length < 1)
                 return false;
 
-            string clientKey = request.Headers["Sec-WebSocket-Key"];
+            string clientKey = SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Key");
             string serverKey = SacocheWebSocket.ComputeServerKey(clientKey);
 
             StringBuilder sb = new StringBuilder();
