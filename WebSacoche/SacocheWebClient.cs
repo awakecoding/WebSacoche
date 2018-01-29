@@ -101,6 +101,7 @@ namespace Sacoche
             writer = new StreamWriter(stream);
             reader = new StreamReader(stream);
             writer.AutoFlush = true;
+            writer.NewLine = "\r\n";
         }
     }
 }
