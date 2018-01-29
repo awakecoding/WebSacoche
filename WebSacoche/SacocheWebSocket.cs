@@ -95,8 +95,12 @@ namespace Sacoche
         private static readonly Random random = new Random();
 
         public delegate void TextMessageEventHander(SacocheWebSocket socket, string message);
+
         public delegate void BinaryMessageEventHander(SacocheWebSocket socket, byte[] data);
+
         public delegate void CloseEventHander(SacocheWebSocket socket, bool clean, ushort code, string reason);
+
+        public bool Connected => client != null && client.Connected;
 
         bool server;
         private TcpClient client;
@@ -109,16 +113,17 @@ namespace Sacoche
 
         public event CloseEventHander OnClose;
 
+
         public int ReadyState { get; private set; }
 
         public SacocheWebSocket()
         {
-            this.server = false;
+            server = false;
         }
 
         internal SacocheWebSocket(TcpClient client, Stream stream)
         {
-            this.server = true;
+            server = true;
             InitializeConnected(client, stream);
         }
 
@@ -185,7 +190,7 @@ namespace Sacoche
 
         public void Start()
         {
-            if ((receivingTask == null) && (ReadyState == WS_READY_STATE_OPEN))
+            if (receivingTask == null && ReadyState == WS_READY_STATE_OPEN)
             {
                 receivingTask = ReceiveAsync();
             }
@@ -234,25 +239,28 @@ namespace Sacoche
             MemoryStream memoryStream = new MemoryStream();
             byte lastOpCode = WS_OPCODE_CLOSE;
 
-            while (true)
+            while (Connected)
             {
-                WebSocketPacket packet;
-
                 try
                 {
-                    packet = await ReadPacketHeaderAsync();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine(ex.ToString());
-                    Stop();
-                    break;
-                }
+                    WebSocketPacket packet;
 
-                byte opcode = packet.Opcode == WS_OPCODE_CONTINUATION ? lastOpCode : packet.Opcode;
+                    try
+                    {
+                        packet = await ReadPacketHeaderAsync();
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex.ToString());
+                        OnClose?.Invoke(this, false, WS_CLOSE_STATUS_PROTOCOL_ERROR, ex.ToString());
+                        Stop();
+                        break;
+                    }
 
-                if ((opcode == WS_OPCODE_TEXT) || (opcode == WS_OPCODE_BINARY))
-                {
+                    byte opcode = packet.Opcode == WS_OPCODE_CONTINUATION ? lastOpCode : packet.Opcode;
+
+                    if ((opcode == WS_OPCODE_TEXT) || (opcode == WS_OPCODE_BINARY))
+                    {
                         memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
 
                         if (packet.Fin)
@@ -270,41 +278,51 @@ namespace Sacoche
 
                             memoryStream.SetLength(0);
                         }
-                }
-                else if (opcode == WS_OPCODE_PING)
-                {
+                    }
+                    else if (opcode == WS_OPCODE_PING)
+                    {
                         Send(new WebSocketPacket
                         {
                             Fin = true,
                             Opcode = WS_OPCODE_PONG,
                             PayloadData = packet.PayloadData
-                        });   
-                }
-                else if (opcode == WS_OPCODE_PONG)
-                {
-                    /* do nothing */
-                }
-                else if (opcode == WS_OPCODE_CLOSE)
-                {
-                    ushort code = WS_CLOSE_STATUS_NORMAL;
-                    string reason = "";
-
-                    if (packet.PayloadLength >= 2)
+                        });
+                    }
+                    else if (opcode == WS_OPCODE_PONG)
                     {
-                        code = (ushort) ((packet.PayloadData[0] << 8) | packet.PayloadData[1]);
+                        /* do nothing */
+                    }
+                    else if (opcode == WS_OPCODE_CLOSE)
+                    {
+                        ushort code = WS_CLOSE_STATUS_NORMAL;
+                        string reason = "";
+
+                        if (packet.PayloadLength >= 2)
+                        {
+                            code = (ushort) ((packet.PayloadData[0] << 8) | packet.PayloadData[1]);
+                        }
+
+                        OnClose?.Invoke(this, true, code, reason);
+                        Stop();
+                    }
+                    else
+                    {
+                        OnClose?.Invoke(this, false, WS_CLOSE_STATUS_PROTOCOL_ERROR, "");
+                        Stop();
                     }
 
-                    OnClose?.Invoke(this, true, code, reason);
-                    Stop();
+                    lastOpCode = opcode;
                 }
-                else
+                catch (Exception e)
                 {
-                    OnClose?.Invoke(this, false, WS_CLOSE_STATUS_PROTOCOL_ERROR, "");
+                    OnClose?.Invoke(this, false, WS_CLOSE_STATUS_PROTOCOL_ERROR, e.ToString());
                     Stop();
+                    break;
                 }
-
-                lastOpCode = opcode;
             }
+
+            OnClose?.Invoke(this, false, WS_CLOSE_STATUS_NORMAL, "");
+            Stop();
         }
 
         private async Task<WebSocketPacket> ReadPacketHeaderAsync()
@@ -357,7 +375,7 @@ namespace Sacoche
         }
 
         private void Send(WebSocketPacket packet)
-        {            
+        {
             using (MemoryStream memoryStream = new MemoryStream())
             {
                 BinaryWriter writer = new BinaryWriter(memoryStream);
@@ -367,24 +385,24 @@ namespace Sacoche
                 byte[] mask = new byte[4];
                 random.NextBytes(mask);
 
-                writer.Write((byte)(WS_BIT_FIN | (byte) packet.Opcode));
+                writer.Write((byte) (WS_BIT_FIN | (byte) packet.Opcode));
 
-                byte masked = (byte)(packet.Masked ? WS_BIT_MASK : 0);
+                byte masked = (byte) (packet.Masked ? WS_BIT_MASK : 0);
 
                 if (packet.PayloadLength < 126)
                 {
-                    writer.Write((byte)(masked | (byte) packet.PayloadLength));
+                    writer.Write((byte) (masked | (byte) packet.PayloadLength));
                 }
                 else if (packet.PayloadLength <= 0xFFFF)
                 {
                     byte[] bytes16 = BitConverter.GetBytes((UInt16) packet.PayloadLength).Reverse().ToArray();
-                    writer.Write((byte)(masked | WS_PAYLOAD_16));
+                    writer.Write((byte) (masked | WS_PAYLOAD_16));
                     writer.Write(bytes16);
                 }
                 else
                 {
                     byte[] bytes64 = BitConverter.GetBytes((UInt64) packet.PayloadLength).Reverse().ToArray();
-                    writer.Write((byte)(masked | WS_PAYLOAD_64));
+                    writer.Write((byte) (masked | WS_PAYLOAD_64));
                     writer.Write(bytes64);
                 }
 
