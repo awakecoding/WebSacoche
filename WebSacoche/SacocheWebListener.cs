@@ -126,22 +126,18 @@ namespace Sacoche
             if (!request.Headers.HasValue("Sec-WebSocket-Key"))
                 return false;
 
-            SacocheWebResponse response = new SacocheWebResponse
-            {
-                Version = request.Version,
-                Code = 101,
-                Reason = "Switching Protocols"
-            };
-
-            response.Headers["Upgrade"] = "websocket";
-            response.Headers["Connection"] = "Upgrade";
-            response.Headers["Server"] = "WebSacoche";
-
             string clientKey = request.Headers["Sec-WebSocket-Key"];
             string serverKey = SacocheWebSocket.ComputeServerKey(clientKey);
-            response.Headers["Sec-WebSocket-Accept"] = serverKey;
 
-            await webClient.SendAsync(response);
+            StringBuilder sb = new StringBuilder();
+            sb.Append("HTTP/1.1 101 Switching Protocols\r\n");
+            sb.Append("Upgrade: websocket\r\n");
+            sb.Append("Connection: Upgrade\r\n");
+            sb.Append("Server: WebSacoche\r\n");
+            sb.Append("Sec-WebSocket-Accept: " + serverKey + "\r\n");
+            string message = sb.ToString();
+
+            await webClient.SendAsync(message);
 
             OnWebSocketConnection?.Invoke(this, webSocket);
 
