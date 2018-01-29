@@ -84,15 +84,9 @@ namespace Sacoche
             return message;
         }
 
-        public async Task SendAsync(SacocheWebMessage message)
+        public async Task SendAsync(string message)
         {          
-            await writer.WriteLineAsync(message.ToString());
-
-            if (message.Data != null && message.Data.Length > 0)
-            {
-                Stream.Write(message.Data, 0, message.Data.Length);
-                Stream.Flush();
-            }
+            await writer.WriteLineAsync(message);
         }
 
         private void SetStream(Stream stream)

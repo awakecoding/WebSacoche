@@ -15,19 +15,5 @@ namespace Sacoche
 
             return base.Parse(lines);
         }
-
-        public override string ToString()
-        {
-            StringBuilder stringBuilder = new StringBuilder();
-
-            stringBuilder.Append($"{Version} {Code} {Reason}\r\n");
-
-            foreach (var header in Headers.GetKeys())
-            {
-                stringBuilder.Append($"{header}: {Headers.GetValue(header)}\r\n");
-            }
-
-            return stringBuilder.ToString();
-        }
     }
 }

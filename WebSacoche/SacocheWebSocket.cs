@@ -154,23 +154,19 @@ namespace Sacoche
                     await webClient.SslAuthenticateAsClientAsync(uri.Host);
                 }
 
-                SacocheWebRequest request = new SacocheWebRequest
-                {
-                    Method = "GET",
-                    Path = uri.AbsolutePath,
-                    Version = "HTTP/1.1"
-                };
-
                 string clientKey = GenerateClientKey();
                 string serverKey = ComputeServerKey(clientKey);
 
-                request.Headers["Connection"] = "Upgrade";
-                request.Headers["Upgrade"] = "websocket";
-                request.Headers["Host"] = uri.Host;
-                request.Headers["Sec-WebSocket-Version"] = "13";
-                request.Headers["Sec-WebSocket-Key"] = clientKey;
+                StringBuilder sb = new StringBuilder();
+                sb.Append("GET " + uri.AbsolutePath + " HTTP/1.1\r\n");
+                sb.Append("Upgrade: websocket\r\n");
+                sb.Append("Connection: Upgrade\r\n");
+                sb.Append("Host: " + uri.Host + "\r\n");
+                sb.Append("Sec-WebSocket-Version: " + "13" + "\r\n");
+                sb.Append("Sec-WebSocket-Key: " + clientKey + "\r\n");
+                string message = sb.ToString();
 
-                await webClient.SendAsync(request);
+                await webClient.SendAsync(message);
 
                 SacocheWebResponse response = await webClient.ReceiveAsync<SacocheWebResponse>();
 
