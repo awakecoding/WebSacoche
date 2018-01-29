@@ -123,8 +123,7 @@ namespace Sacoche
                     {
                         Version = request.Version,
                         Code = 101,
-                        Reason = "Switching Protocols",
-                        StatusCode = SacocheHttpStatusCode.SwitchingProtocols
+                        Reason = "Switching Protocols"
                     };
 
                     response.Headers["Upgrade"] = "websocket";
@@ -154,8 +153,7 @@ namespace Sacoche
                 {
                     Version = request.Version,
                     Code = 500,
-                    Reason = "Internal Server Error",
-                    StatusCode = SacocheHttpStatusCode.InternalServerError
+                    Reason = "Internal Server Error"
                 };
 
                 await webClient.SendAsync(response);
