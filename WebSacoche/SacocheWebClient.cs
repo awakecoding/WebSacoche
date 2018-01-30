@@ -32,8 +32,7 @@ namespace Sacoche
 
             try
             {
-                sslStream.AuthenticateAsServer(certificate, false, proto, false);
-                
+                await sslStream.AuthenticateAsServerAsync(certificate, false, proto, false);
                 SetStream(sslStream);
 
                 return true;

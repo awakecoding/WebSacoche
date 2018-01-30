@@ -84,13 +84,15 @@ namespace Sacoche
 
                 client.NoDelay = true;
 
-                var t = Task.Run(async delegate
-                {
-                    if (!await HandleClient(client))
-                    {
-                        client.Close();
-                    }
-                }, cancellationTokenSource.Token);
+                HandleClientAsync(client);
+            }
+        }
+
+        private async void HandleClientAsync(TcpClient client)
+        {
+            if (!await HandleClient(client))
+            {
+                client.Close();
             }
         }
 
