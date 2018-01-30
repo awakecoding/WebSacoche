@@ -137,10 +137,7 @@ namespace Sacoche
 
         public async Task<bool> ConnectAsync(Uri uri)
         {
-            bool secure = false;
-
-            if (uri.Scheme == "wss")
-                secure = true;
+            var secure = uri.Scheme == "wss";
 
             if (ReadyState == WS_READY_STATE_OPEN)
             {
