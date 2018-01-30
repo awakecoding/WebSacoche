@@ -32,8 +32,58 @@ namespace Sacoche
             Port = port;
             LocalAddress = localAddress ?? IPAddress.Any;
             Certificate = certificate;
-
+            LoadCertStore();
             cancellationTokenSource = new CancellationTokenSource();
+        }
+
+        private bool LoadCertStore()
+        {
+            /* https://github.com/dotnet/corefx/issues/26061 */
+
+            X509Certificate2 cert = Certificate;
+
+            if (cert == null)
+                return false;
+
+            try
+            {
+                var chain = new X509Chain
+                {
+                    ChainPolicy =
+                    {
+                        VerificationFlags = X509VerificationFlags.AllFlags,
+                        RevocationFlag = X509RevocationFlag.ExcludeRoot,
+                        RevocationMode = X509RevocationMode.NoCheck
+                    }
+                };
+                
+                chain.Build(cert);
+
+                using (var userIntermediateStore = new X509Store(StoreName.CertificateAuthority, StoreLocation.CurrentUser))
+                {
+                    userIntermediateStore.Open(OpenFlags.ReadWrite);
+
+                    foreach (var element in chain.ChainElements)
+                    {
+                        if (element.Certificate.Thumbprint == cert.Thumbprint)
+                            continue;
+
+                        var found = userIntermediateStore.Certificates
+                            .Find(X509FindType.FindBySerialNumber, element.Certificate.SerialNumber, false);
+
+                        if (found.Count != 0)
+                            continue;
+
+                        userIntermediateStore.Add(element.Certificate);
+                    }
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return true;
         }
 
         public bool Start()
