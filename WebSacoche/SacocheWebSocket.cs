@@ -209,6 +209,46 @@ namespace Sacoche
             }
         }
 
+        internal async Task<bool> AcceptAsync(SacocheWebClient webClient)
+        {
+            string[] lines = await webClient.ReceiveAsync();
+
+            if (lines == null)
+                return false;
+
+            SacocheHttp.ParseRequestLine(lines[0], out var method, out var path, out var version);
+
+            if (method != "GET")
+                return false;
+
+            if (SacocheHttp.GetFieldValue(lines, "Connection") != "Upgrade")
+                return false;
+
+            if (SacocheHttp.GetFieldValue(lines, "Upgrade") != "websocket")
+                return false;
+
+            if (SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Version") != "13")
+                return false;
+
+            if (SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Key").Length < 1)
+                return false;
+
+            string clientKey = SacocheHttp.GetFieldValue(lines, "Sec-WebSocket-Key");
+            string serverKey = SacocheWebSocket.ComputeServerKey(clientKey);
+
+            StringBuilder sb = new StringBuilder();
+            sb.Append("HTTP/1.1 101 Switching Protocols\r\n");
+            sb.Append("Upgrade: websocket\r\n");
+            sb.Append("Connection: Upgrade\r\n");
+            sb.Append("Server: WebSacoche\r\n");
+            sb.Append("Sec-WebSocket-Accept: " + serverKey + "\r\n");
+            string message = sb.ToString();
+
+            await webClient.SendAsync(message);
+
+            return true;
+        }
+
         public void Start()
         {
             if ((receivingTask == null) && (ReadyState == WS_READY_STATE_OPEN))
