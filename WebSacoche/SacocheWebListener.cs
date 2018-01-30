@@ -100,7 +100,10 @@ namespace Sacoche
 
             if (Certificate != null)
             {
-                await webClient.SslAuthenticateAsServerAsync(Certificate);
+                var authenticated = await webClient.SslAuthenticateAsServerAsync(Certificate);
+
+                if (!authenticated)
+                    return false;
             }
 
             SacocheWebSocket webSocket = new SacocheWebSocket(client, webClient.Stream);

@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Security;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Threading.Tasks;
@@ -24,18 +25,44 @@ namespace Sacoche
             SetStream(client.GetStream());
         }
 
-        public async Task SslAuthenticateAsServerAsync(X509Certificate2 certificate)
+        public async Task<bool> SslAuthenticateAsServerAsync(X509Certificate2 certificate)
         {
-            SslStream sslStream = new SslStream(Stream);
-            await sslStream.AuthenticateAsServerAsync(certificate).ConfigureAwait(false);
-            SetStream(sslStream);
+            var sslStream = new SslStream(Stream);
+            const SslProtocols proto = SslProtocols.Tls12 | SslProtocols.Tls11;
+
+            try
+            {
+                sslStream.AuthenticateAsServer(certificate, false, proto, false);
+                
+                SetStream(sslStream);
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Unable to authenticate client : {e}");
+                
+                return false;
+            }
         }
 
-        public async Task SslAuthenticateAsClientAsync(string targetHost)
+        public async Task<bool> SslAuthenticateAsClientAsync(string targetHost)
         {
-            SslStream sslStream = new SslStream(Stream);
-            await sslStream.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
-            SetStream(sslStream);
+            var sslStream = new SslStream(Stream);
+            
+            try
+            {
+                await sslStream.AuthenticateAsClientAsync(targetHost).ConfigureAwait(false);
+                SetStream(sslStream);
+
+                return true;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine($"Unable to authenticate targeted host {targetHost} : {e}");
+                
+                return false;
+            }
         }
         
         public async Task<string[]> ReceiveAsync()
