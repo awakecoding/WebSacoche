@@ -37,10 +37,8 @@ namespace Sacoche
 
                 return true;
             }
-            catch (Exception e)
-            {
-                Console.WriteLine($"Unable to authenticate client : {e}");
-                
+            catch
+            {   
                 return false;
             }
         }
@@ -56,10 +54,8 @@ namespace Sacoche
 
                 return true;
             }
-            catch (Exception e)
+            catch
             {
-                Console.WriteLine($"Unable to authenticate targeted host {targetHost} : {e}");
-                
                 return false;
             }
         }
