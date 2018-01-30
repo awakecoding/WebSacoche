@@ -77,6 +77,9 @@ namespace Sacoche
         public const byte WS_PAYLOAD_64 = 127;
         public const string WS_MAGIC_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+        public const int WS_FLAG_FIN = 1;
+        public const int WS_FLAG_BINARY = 2;
+
         public const ushort WS_READY_STATE_CONNECTING = 0;
         public const ushort WS_READY_STATE_OPEN = 1;
         public const ushort WS_READY_STATE_CLOSING = 2;
@@ -110,9 +113,7 @@ namespace Sacoche
 
         public event TextMessageEventHander OnTextMessage;
         public event BinaryMessageEventHander OnBinaryMessage;
-
         public event CloseEventHander OnClose;
-
 
         public int ReadyState { get; private set; }
 
@@ -134,8 +135,13 @@ namespace Sacoche
             ReadyState = WS_READY_STATE_OPEN;
         }
 
-        public async Task<bool> ConnectAsync(Uri uri, bool secure = false)
+        public async Task<bool> ConnectAsync(Uri uri)
         {
+            bool secure = false;
+
+            if (uri.Scheme == "wss")
+                secure = true;
+
             if (ReadyState == WS_READY_STATE_OPEN)
             {
                 return true;
@@ -143,7 +149,7 @@ namespace Sacoche
 
             try
             {
-                TcpClient client = new TcpClient {NoDelay = true};
+                TcpClient client = new TcpClient { NoDelay = true };
 
                 await client.ConnectAsync(uri.Host, uri.Port).ConfigureAwait(false);
 
@@ -153,6 +159,8 @@ namespace Sacoche
                 {
                     await webClient.SslAuthenticateAsClientAsync(uri.Host);
                 }
+
+                InitializeConnected(client, webClient.Stream);
 
                 string clientKey = GenerateClientKey();
                 string serverKey = ComputeServerKey(clientKey);
@@ -194,7 +202,6 @@ namespace Sacoche
                     return false;
                 }
 
-                InitializeConnected(client, webClient.Stream);
                 Start();
 
                 return true;
@@ -207,7 +214,7 @@ namespace Sacoche
 
         public void Start()
         {
-            if (receivingTask == null && ReadyState == WS_READY_STATE_OPEN)
+            if ((receivingTask == null) && (ReadyState == WS_READY_STATE_OPEN))
             {
                 receivingTask = ReceiveAsync();
             }
@@ -403,55 +410,58 @@ namespace Sacoche
             return await stream.ReadAsync(buffer, 0, count);
         }
 
+        private void SendFrame(byte[] data, int size, int flags, int opcode)
+        {
+            using (MemoryStream memoryStream = new MemoryStream())
+            {
+                byte masked = (byte) (!server ? WS_BIT_MASK : 0);
+
+                BinaryWriter writer = new BinaryWriter(memoryStream);
+
+                byte[] mask = new byte[4];
+                random.NextBytes(mask);
+
+                writer.Write((byte) (WS_BIT_FIN | (byte) opcode));
+
+                if (size < 126)
+                {
+                    writer.Write((byte) (masked | (byte) size));
+                }
+                else if (size <= 0xFFFF)
+                {
+                    byte[] bytes16 = BitConverter.GetBytes((UInt16) size).Reverse().ToArray();
+                    writer.Write((byte) (masked | WS_PAYLOAD_16));
+                    writer.Write(bytes16);
+                }
+                else
+                {
+                    byte[] bytes64 = BitConverter.GetBytes((UInt64) size).Reverse().ToArray();
+                    writer.Write((byte) (masked | WS_PAYLOAD_64));
+                    writer.Write(bytes64);
+                }
+
+                if (size > 0)
+                {
+                    if (masked > 0)
+                    {
+                        writer.Write(mask);
+                        Mask(data, mask);
+                    }
+
+                    memoryStream.Write(data, 0, size);
+                }
+
+                stream.Write(memoryStream.ToArray(), 0, (int) memoryStream.Length);
+                stream.Flush();
+            }
+        }
+
         private void Send(WebSocketPacket packet)
         {
-            if (Connected)
-            {
-                using (MemoryStream memoryStream = new MemoryStream())
-                {
-                    BinaryWriter writer = new BinaryWriter(memoryStream);
+            if (!Connected)
+                return;
 
-                    packet.Masked = !server;
-
-                    byte[] mask = new byte[4];
-                    random.NextBytes(mask);
-
-                    writer.Write((byte) (WS_BIT_FIN | (byte) packet.Opcode));
-
-                    byte masked = (byte) (packet.Masked ? WS_BIT_MASK : 0);
-
-                    if (packet.PayloadLength < 126)
-                    {
-                        writer.Write((byte) (masked | (byte) packet.PayloadLength));
-                    }
-                    else if (packet.PayloadLength <= 0xFFFF)
-                    {
-                        byte[] bytes16 = BitConverter.GetBytes((UInt16) packet.PayloadLength).Reverse().ToArray();
-                        writer.Write((byte) (masked | WS_PAYLOAD_16));
-                        writer.Write(bytes16);
-                    }
-                    else
-                    {
-                        byte[] bytes64 = BitConverter.GetBytes((UInt64) packet.PayloadLength).Reverse().ToArray();
-                        writer.Write((byte) (masked | WS_PAYLOAD_64));
-                        writer.Write(bytes64);
-                    }
-
-                    if (packet.PayloadLength > 0)
-                    {
-                        if (packet.Masked)
-                        {
-                            writer.Write(mask);
-                            Mask(packet.PayloadData, mask);
-                        }
-
-                        memoryStream.Write(packet.PayloadData, 0, packet.PayloadData.Length);
-                    }
-
-                    stream.Write(memoryStream.ToArray(), 0, (int) memoryStream.Length);
-                    stream.Flush();
-                }
-            }
+            SendFrame(packet.PayloadData, packet.PayloadLength, 0, packet.Opcode);
         }
 
         private static string GenerateClientKey()
