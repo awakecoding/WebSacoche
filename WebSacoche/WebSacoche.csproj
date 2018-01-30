@@ -7,7 +7,7 @@
     <PackageLicenseUrl>https://github.com/Phyyl/Netwrk/blob/master/LICENSE</PackageLicenseUrl>
     <Authors>phyyl - richerarc - mamoreau</Authors>
     <PackageId>WebSacoche</PackageId>
-    <Version>1.0.4</Version>
+    <Version>1.0.6</Version>
     <PackageTags>websocket server client</PackageTags>
     <Copyright>Copyright © 2017 Devolutions</Copyright>
     <PackageProjectUrl>https://github.com/wayk/WebSacoche</PackageProjectUrl>
