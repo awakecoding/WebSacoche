@@ -236,26 +236,13 @@ namespace Sacoche
 
         public void Send(string message)
         {
-            WebSocketPacket packet = new WebSocketPacket
-            {
-                Fin = true,
-                Opcode = WS_OPCODE_TEXT,
-                PayloadData = Encoding.UTF8.GetBytes(message)
-            };
-
-            Send(packet);
+            byte[] data = Encoding.UTF8.GetBytes(message);
+            SendFrame(data, data.Length, WS_FLAG_FIN, WS_OPCODE_TEXT);
         }
 
         public void Send(byte[] data)
         {
-            WebSocketPacket packet = new WebSocketPacket
-            {
-                Fin = true,
-                Opcode = WS_OPCODE_BINARY,
-                PayloadData = data
-            };
-
-            Send(packet);
+            SendFrame(data, data.Length, WS_FLAG_FIN, WS_OPCODE_BINARY);
         }
 
         private async Task ReceiveAsync()
@@ -312,12 +299,7 @@ namespace Sacoche
                     }
                     else if (opcode == WS_OPCODE_PING)
                     {
-                        Send(new WebSocketPacket
-                        {
-                            Fin = true,
-                            Opcode = WS_OPCODE_PONG,
-                            PayloadData = packet.PayloadData
-                        });
+                        SendFrame(packet.PayloadData, packet.PayloadLength, WS_FLAG_FIN, WS_OPCODE_PONG);
                     }
                     else if (opcode == WS_OPCODE_PONG)
                     {
@@ -454,14 +436,6 @@ namespace Sacoche
                 stream.Write(memoryStream.ToArray(), 0, (int) memoryStream.Length);
                 stream.Flush();
             }
-        }
-
-        private void Send(WebSocketPacket packet)
-        {
-            if (!Connected)
-                return;
-
-            SendFrame(packet.PayloadData, packet.PayloadLength, 0, packet.Opcode);
         }
 
         private static string GenerateClientKey()
